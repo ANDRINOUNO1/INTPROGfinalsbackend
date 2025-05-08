@@ -1,71 +1,84 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const authorize = require('../_middleware/authorize');
-const Role = require('../_helpers/role');
-const employeeService = require('./employee.service');
+const validateRequest = require("../_middleware/validate-request");
+const authorize = require("../_middleware/authorize");
+const Role = require("../_helpers/role");
+const Joi = require("joi");
+const employeeService = require('../employees/employee.service')
 
-// Routes
-router.post('/', authorize(Role.Admin), create);
-router.get('/', authorize(), getAll);
-router.get('/:id', authorize(), getById);
-router.put('/:id', authorize(Role.Admin), update);
-router.delete('/:id', authorize(Role.Admin), _delete);
-router.post('/:id/transfer', authorize(Role.Admin), transfer);
+router.get("/", authorize(Role.Admin), getAll)
+router.get("/:id", authorize(), getById)
+router.post("/", authorize(Role.Admin), createSchema, create)
+router.put("/:id", authorize(Role.Admin), updateSchema, update)
+router.delete("/:id", authorize(Role.Admin), _delete)
 
-// Handlers
-async function create(req, res, next) {
-    try {
-        const employee = await employeeService.create(req.body);
-        res.status(201).json(employee);
-    } catch (err) {
-        next(err);
-    }
+module.exports = router
+
+function getById(req, res, next){
+  if(req.user.role !== Role.Admin){
+    return res.status(401).json({ msg: 'Unauthorized' })
+  }
+
+  employeeService
+    .getById(req.params.id)
+    .then(employee => (employee ? res.json(employee) : res.sendStatus(404)))
+    .catch(next)
 }
 
-async function getAll(req, res, next) {
-    try {
-        const employees = await employeeService.getAll();
-        res.json(employees);
-    } catch (err) {
-        next(err);
-    }
+function getAll(req, res, next){
+  employeeService
+    .getAll()
+    .then(employees => res.json(employees))
+    .catch(next)
 }
 
-async function getById(req, res, next) {
-    try {
-        const employee = await employeeService.getById(req.params.id);
-        if (!employee) return res.status(404).json({ message: 'Employee not found' });
-        res.json(employee);
-    } catch (err) {
-        next(err);
-    }
+function createSchema(req, res, next){
+  const schema = Joi.object({
+    employeeId: Joi.string().required(),
+    position: Joi.string().required(),
+    userId: Joi.number().required(),
+    departmentId: Joi.number().required(),
+    isActive: Joi.boolean().required()
+  })
+  validateRequest(req, next, schema)
 }
 
-async function update(req, res, next) {
-    try {
-        const employee = await employeeService.update(req.params.id, req.body);
-        res.json(employee);
-    } catch (err) {
-        next(err);
-    }
+function updateSchema(req, res, next) {
+  const schema = Joi.object({
+    employeeId: Joi.string(),
+    position: Joi.string(),
+    userId: Joi.number(),
+    departmentId: Joi.number(),
+    isActive: Joi.boolean()
+  })
+  validateRequest(req, next, schema)
 }
 
-async function _delete(req, res, next) {
-    try {
-        await employeeService.delete(req.params.id);
-        res.json({ message: 'Employee deleted' });
-    } catch (err) {
-        next(err);
-    }
+function create(req, res, next){
+  // Check if user already has an employee record
+  employeeService
+    .checkUserHasEmployee(req.body.userId)
+    .then(hasEmployee => {
+      if (hasEmployee) {
+        return res.status(400).json({ message: 'User already has an employee record' });
+      }
+      return employeeService.create(req.body)
+        .then(employee => res.json(employee))
+        .catch(next);
+    })
+    .catch(next);
 }
 
-async function transfer(req, res, next) {
-    try {
-        await employeeService.transfer(req.params.id, req.body.departmentId);
-        res.json({ message: 'Employee transferred' });
-    } catch (err) {
-        next(err);
-    }
+function update(req, res, next) {
+  employeeService
+    .update(req.params.id, req.body)
+    .then((employee) => res.json(employee))
+    .catch(next)
 }
 
-module.exports = router;
+function _delete(req, res, next) {
+  employeeService
+    .delete(req.params.id)
+    .then(() => res.json({ message: 'Employee deleted successfully' }))
+    .catch(next)
+}
