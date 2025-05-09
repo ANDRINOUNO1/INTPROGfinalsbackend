@@ -12,5 +12,5 @@ function model(sequelize){
     timastamps: true
   }
 
-  return sequelize.define('departments', attributes, options)
+  return sequelize.define('department', attributes, options)
 }
