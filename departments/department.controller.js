@@ -1,61 +1,79 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const departmentService = require('./department.service');
-const authorize = require('../_middleware/authorize');
-const Role = require('../_helpers/role');
+const Joi = require("joi");
+const validateRequest = require("../_middleware/validate-request");
+const authorize = require("../_middleware/authorize");
+const Role = require("../_helpers/role");
+const departmentService = require('../departments/department.service')
 
-// Routes
-router.get('/', authorize(), getAll);
-router.get('/:id', authorize(), getById);
-router.post('/', authorize(Role.Admin), create);
-router.put('/:id', authorize(Role.Admin), update);
-router.delete('/:id', authorize(Role.Admin), _delete);
+router.get("/", authorize(Role.Admin), getAll)
+router.get("/:id", authorize(), getById)
+router.post("/", authorize(Role.Admin), createSchema, create)
+router.put("/:id", authorize(), updateSchema, update)
+router.delete("/:id", authorize(), _delete)
 
-// Handlers
-async function getAll(req, res, next) {
-    try {
-        const departments = await departmentService.getAll();
-        res.json(departments);
-    } catch (err) {
-        next(err);
-    }
+module.exports = router
+
+function _delete(req, res, next){
+  if (req.user.role !== Role.Admin) {
+    return res.status(401).json({ msg: "Unauthorized" });
+  }
+
+  departmentService.delete(req.params.id)
+    .then(() => res.json({ msg: 'Department deleted successfully'}))
+    .catch(next)
 }
 
-async function getById(req, res, next) {
-    try {
-        const department = await departmentService.getById(req.params.id);
-        if (!department) return res.status(404).json({ message: 'Department not found' });
-        res.json(department);
-    } catch (err) {
-        next(err);
-    }
+function getById(req, res, next){
+  if(req.user.role !== Role.Admin){
+    return res.status(401).json({ msg: 'Unauthorized' })
+  }
+
+  departmentService
+    .getById(req.params.id)
+    .then((department) => (department ? res.json(department) : res.sendStatus(404)))
+    .catch(next)
 }
 
-async function create(req, res, next) {
-    try {
-        const department = await departmentService.create(req.body);
-        res.status(201).json(department);
-    } catch (err) {
-        next(err);
-    }
+function updateSchema(req, res, next){
+  const schema = Joi.object({
+    name: Joi.string().empty(""),
+    description: Joi.string().empty("")
+  })
+  validateRequest(req, next, schema)
 }
 
-async function update(req, res, next) {
-    try {
-        const department = await departmentService.update(req.params.id, req.body);
-        res.json(department);
-    } catch (err) {
-        next(err);
-    }
+function update(req, res, next){
+  if(req.user.role !== Role.Admin){
+    return res.status(401).json({ msg: 'Unauthorized' })
+  }
+
+  departmentService
+    .update(req.params.id, req.body)
+    .then((department) => res.json(department))
+    .catch(next)
 }
 
-async function _delete(req, res, next) {
-    try {
-        await departmentService.delete(req.params.id);
-        res.json({ message: 'Department deleted successfully' });
-    } catch (err) {
-        next(err);
-    }
+function getAll(req, res, next){
+  departmentService
+    .getAll()
+    .then((departments) => res.json(departments))
+    .catch(next)
 }
 
-module.exports = router;
+function createSchema(req, res, next){
+  const schema = Joi.object({
+    name: Joi.string().required(),
+    description: Joi.string().required()
+  })
+  validateRequest(req, next, schema)
+}
+
+function create(req, res, next){
+  
+
+  departmentService
+    .create(req.body)
+    .then((department) => res.json(department))
+    .catch(next)
+}

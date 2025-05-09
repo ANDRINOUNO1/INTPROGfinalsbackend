@@ -7,6 +7,14 @@ module.exports = (sequelize, DataTypes) => {
         },
         employeeId: {
             type: DataTypes.INTEGER,
+            allowNull: false,
+            references: {
+                model: 'Employees',
+                key: 'id'
+            }
+        },
+        type: {
+            type: DataTypes.STRING,
             allowNull: false
         },
         status: {
@@ -28,30 +36,33 @@ module.exports = (sequelize, DataTypes) => {
         },
         requestId: {
             type: DataTypes.INTEGER,
-            allowNull: false
+            allowNull: false,
+            references: {
+                model: 'Requests',
+                key: 'id'
+            }
         },
-        itemName: {
+        name: {
             type: DataTypes.STRING,
             allowNull: false
         },
         quantity: {
             type: DataTypes.INTEGER,
-            allowNull: false
+            allowNull: false,
+            defaultValue: 1
         }
     });
 
-    Request.associate = models => {
-        Request.hasMany(models.RequestItem, {
-            foreignKey: 'requestId',
-            as: 'items',
-            onDelete: 'CASCADE'
-        });
-        Request.belongsTo(models.Employee, { foreignKey: 'employeeId' });
-    };
-
-    RequestItem.associate = models => {
-        RequestItem.belongsTo(models.Request, { foreignKey: 'requestId' });
-    };
+    // Define associations
+    Request.hasMany(RequestItem, {
+        foreignKey: 'requestId',
+        as: 'items',
+        onDelete: 'CASCADE'
+    });
+    RequestItem.belongsTo(Request, { 
+        foreignKey: 'requestId',
+        as: 'request'
+    });
 
     // Attach sub-model to allow importing from a single file
     Request.RequestItem = RequestItem;
